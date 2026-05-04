@@ -3,6 +3,7 @@
 import React from "react";
 import { ZoneType } from "./MapZone";
 import { DetectedColor } from "./CameraDetector";
+import { AREAS, AreaCode, getAllowedHelmetColors, HELMET_COLORS } from "@/data/zones";
 
 interface ValidationStatusProps {
   selectedZone: ZoneType;
@@ -21,13 +22,18 @@ export default function ValidationStatus({ selectedZone, detectedColor }: Valida
     </svg>
   );
 
-  const zoneRules: Record<NonNullable<ZoneType>, { name: string; req: DetectedColor[] }> = {
-    campamento: { name: "Campamento", req: ["red", "green", "unknown"] }, // Libre
-    taller: { name: "Taller Mecánico", req: ["green"] }, // Solo verde
-    tajo: { name: "Tajo Abierto", req: ["red"] }, // Solo rojo
-    planta: { name: "Planta de Proceso", req: ["red"] }, // Solo rojo
-    polvorin: { name: "Polvorín", req: ["red"] } // Solo rojo
+  const buildZoneRules = (): Record<NonNullable<ZoneType>, { name: string; req: DetectedColor[] }> => {
+    const rules = {} as Record<NonNullable<ZoneType>, { name: string; req: DetectedColor[] }>;
+    Object.entries(AREAS).forEach(([code, zone]) => {
+      rules[code as AreaCode] = {
+        name: zone.name,
+        req: getAllowedHelmetColors(code as AreaCode) as DetectedColor[]
+      };
+    });
+    return rules;
   };
+
+  const zoneRules = buildZoneRules();
 
   if (!selectedZone) {
     statusMessage = "SELECCIONE ZONA";
@@ -39,36 +45,37 @@ export default function ValidationStatus({ selectedZone, detectedColor }: Valida
     } else {
       zoneNameLabel = rule.name;
 
-      if (rule.req.includes(detectedColor)) {
+      if (detectedColor === "unknown") {
+        statusMessage = "ESPERANDO DETECCIÓN...";
+      } else if (rule.req.includes(detectedColor)) {
         isAccessGranted = true;
         statusMessage = "ACCESO PERMITIDO";
+        statusColorClass = "bg-emerald-500/10 border-emerald-500 text-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.2)]";
+        Icon = (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        );
       } else {
         isAccessGranted = false;
         statusMessage = "ACCESO DENEGADO";
+        statusColorClass = "bg-red-500/10 border-red-500 text-red-400 shadow-[0_0_30px_rgba(239,68,68,0.2)]";
+        Icon = (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        );
       }
-    }
-
-    if (isAccessGranted) {
-      statusColorClass = "bg-emerald-500/10 border-emerald-500 text-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.2)]";
-      Icon = (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      );
-    } else {
-      statusColorClass = "bg-red-500/10 border-red-500 text-red-400 shadow-[0_0_30px_rgba(239,68,68,0.2)]";
-      Icon = (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      );
     }
   }
 
   // Helper for helmet color UI
-  const helmetColorUI = {
-    red: { label: "ROJO", bg: "bg-red-500", text: "text-red-400" },
-    green: { label: "VERDE", bg: "bg-emerald-500", text: "text-emerald-400" },
+  const helmetColorUI: Record<DetectedColor, { label: string; bg: string; text: string }> = {
+    yellow: { label: `VISITA (AMARILLO)`, bg: "bg-yellow-500", text: "text-yellow-400" },
+    red: { label: `BRIGADISTA (ROJO)`, bg: "bg-red-500", text: "text-red-400" },
+    brown: { label: `SEGURIDAD (MARRÓN)`, bg: "bg-amber-800", text: "text-amber-700" },
+    white: { label: `SUPERVISOR (BLANCO)`, bg: "bg-gray-100", text: "text-white" },
+    green: { label: `TRABAJADOR (VERDE)`, bg: "bg-emerald-500", text: "text-emerald-400" },
     unknown: { label: "NO DETECTADO", bg: "bg-gray-500", text: "text-gray-400" },
   };
 
@@ -91,8 +98,8 @@ export default function ValidationStatus({ selectedZone, detectedColor }: Valida
         <div className="bg-[#0f172a] rounded-xl p-4 flex flex-col items-center justify-center border border-[#334155]">
           <span className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1">Casco Detectado</span>
           <div className="flex items-center gap-2">
-            <div className={`w-3 h-3 rounded-full ${helmetColorUI[detectedColor].bg} animate-pulse`} />
-            <span className={`text-lg font-bold ${helmetColorUI[detectedColor].text}`}>
+            <div className={`w-3 h-3 rounded-full ${helmetColorUI[detectedColor].bg} animate-pulse flex-shrink-0`} />
+            <span className={`text-sm md:text-base font-bold ${helmetColorUI[detectedColor].text} leading-tight text-left`}>
               {helmetColorUI[detectedColor].label}
             </span>
           </div>
